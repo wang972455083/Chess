@@ -104,12 +104,16 @@ enum LMSG_ID
 	MSG_C_2_S_LOGIN = 11, //客户端请求登录
 	MSG_S_2_C_LOGIN = 12, //服务器返回客户登录结果
 
+	MSG_C_2_S_TEST = 13,
+	MSG_S_2_C_TEST = 14,
+
 	MSG_TO_GAME_MAX_MSG = 1000,   //以上是转发到gameServer里的
 
-	
+	MSG_C_2_S_LM_LOGIN = 1001,		//登录LM
+	MSG_S_2_C_LM_LOGIN = 1002,		//登录LM
 
-	MSG_C_2_S_DESK_OPT = 1001,		//加入活退出桌子
-	MSG_S_2_C_DESK_OPT = 1002,		//加入或者退出桌子
+	MSG_C_2_S_DESK_OPT = 1003,		//加入活退出桌子
+	MSG_S_2_C_DESK_OPT = 1004,		//加入或者退出桌子
 
 
 	MSG_TO_LOGIC_MANAGER_MAX_MSG = 2000,   //以上是转发到LogicManager上的
@@ -196,6 +200,10 @@ enum LMSG_ID
 
 	MSG_LM_2_L_DESK_OPT = 20003,  //桌子操作
 	MSG_L_2_LM_DESK_OPT = 20004,
+
+	MSG_LM_2_G_USER_STATUS_MODIFY = 20005,//  大厅和房间状态修改
+
+	
 
 };
 
@@ -597,6 +605,100 @@ struct LMsgS2CLogin:public LMsgSC
 	virtual LMsg* Clone(){return new LMsgS2CLogin();}
 };
 
+
+
+
+
+//*****************************************************************************
+
+struct LMsgC2SLMLogin :public LMsgSC
+{
+	LMsgC2SLMLogin() :LMsgSC(MSG_C_2_S_LM_LOGIN)
+		
+	{}
+
+	virtual bool Read(msgpack::object& obj)
+	{
+		ReadMapData(obj, NAME_TO_STR(m_user_id), m_user_id);
+		
+		return true;
+	}
+
+	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
+	{
+		WriteMap(pack, 2);
+		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
+		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
+		
+		return true;
+	}
+
+	virtual LMsg* Clone()
+	{
+		return new LMsgC2SLMLogin();
+	}
+};
+
+//返回玩家登陆结果消息
+struct LMsgS2CLMLogin :public LMsgSC
+{
+	Lint		m_result;//登录错误码，0-登录成功,
+
+	LMsgS2CLMLogin() :LMsgSC(MSG_S_2_C_LM_LOGIN)
+		, m_result(0)
+	{}
+
+	virtual bool Read(msgpack::object& obj)
+	{
+		ReadMapData(obj, NAME_TO_STR(m_result), m_result);
+		ReadMapData(obj, NAME_TO_STR(m_user_id), m_user_id);
+		
+		return true;
+	}
+
+	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
+	{
+		WriteMap(pack, 3);
+		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
+		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
+		WriteKeyValue(pack, NAME_TO_STR(m_result), m_result);
+
+		return true;
+	}
+
+	virtual LMsg* Clone() { return new LMsgS2CLMLogin(); }
+};
+
+
+struct MsgUserInfo
+{
+	int   m_user_id;
+	Lstring m_name;
+	Lstring m_head_icon;
+	
+
+	MSGPACK_DEFINE(m_user_id,m_name, m_head_icon);
+
+public:
+	MsgUserInfo()
+	{
+		m_user_id = 0;
+		
+	}
+
+	MsgUserInfo& operator = (const MsgUserInfo& other)
+	{
+		if (&other == this)
+			return *this;
+
+		m_user_id = other.m_user_id;
+		m_name = other.m_name;
+		m_head_icon = other.m_head_icon;
+
+		return *this;
+	}
+};
+
 struct DeskMsg
 {
 	Lint	m_desk_id;
@@ -604,16 +706,18 @@ struct DeskMsg
 	Lint	m_desk_type;
 	Lint	m_cost;
 
-	//std::vector<Lint>	m_users;
+	std::vector<MsgUserInfo>	m_users;
 
-	MSGPACK_DEFINE(m_desk_id, m_create_id, m_desk_type, m_cost);
+	MSGPACK_DEFINE(m_desk_id, m_create_id, m_desk_type, m_cost, m_users);
 
 public:
 	DeskMsg() :m_desk_id(0), m_create_id(0), m_desk_type(0),m_cost(0)
 	{
-		//m_users.clear();
+		m_users.clear();
 	}
 };
+
+
 
 struct LMsgC2SDeskOpt :public LMsgSC
 {
@@ -622,6 +726,11 @@ struct LMsgC2SDeskOpt :public LMsgSC
 
 	Lint	m_desk_type;
 	Lint	m_cost;
+
+	//MsgUserInfo	m_self;
+	Lstring m_name;
+	Lstring m_head_icon;
+
 
 	enum
 	{
@@ -642,12 +751,28 @@ struct LMsgC2SDeskOpt :public LMsgSC
 
 		ReadMapData(obj, NAME_TO_STR(m_desk_type), m_desk_type);
 		ReadMapData(obj, NAME_TO_STR(m_cost), m_cost);
+		ReadMapData(obj, NAME_TO_STR(m_name), m_name);
+		ReadMapData(obj, NAME_TO_STR(m_head_icon), m_head_icon);
+
+		/*msgpack::object array;
+		ReadMapData(obj, NAME_TO_STR(m_list), array);
+		if (array.type == msgpack::v1::type::ARRAY)
+		{
+			Lint m_count = array.via.array.size;
+			for (Lsize i = 0; i < array.via.array.size; ++i)
+			{
+				DeskMsg v;
+				msgpack::object& obj = *(array.via.array.ptr + i);
+				obj.convert(v);
+				m_list.push_back(v);
+			}
+		}*/
 		return true;
 	}
 
 	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
 	{
-		WriteMap(pack, 6);
+		WriteMap(pack, 8);
 		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
 		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
 		WriteKeyValue(pack, NAME_TO_STR(m_type), m_type);
@@ -655,6 +780,8 @@ struct LMsgC2SDeskOpt :public LMsgSC
 
 		WriteKeyValue(pack, NAME_TO_STR(m_desk_type), m_desk_type);
 		WriteKeyValue(pack, NAME_TO_STR(m_cost), m_cost);
+		WriteKeyValue(pack, NAME_TO_STR(m_name), m_name);
+		WriteKeyValue(pack, NAME_TO_STR(m_head_icon), m_head_icon);
 		
 		return true;
 	}
@@ -670,15 +797,16 @@ struct LMsgC2SDeskOpt :public LMsgSC
 //返回玩家登陆结果消息
 struct LMsgS2CDeskOpt :public LMsgSC
 {
-	Lint		m_errorCode;//0-成功,1-玩家已经存在桌子
+	Lint		m_errorCode;//0-成功,1-玩家已经存在桌子 2,退出的桌子不正确
 	Lint		m_type;
 	DeskMsg		m_desk;
-	Lint		m_logic_server_id;
+	
+	
 
 	LMsgS2CDeskOpt() :LMsgSC(MSG_S_2_C_DESK_OPT)
 		, m_errorCode(0)
 		,m_type(0)
-		, m_logic_server_id(0)
+		
 
 	{}
 
@@ -689,20 +817,21 @@ struct LMsgS2CDeskOpt :public LMsgSC
 		ReadMapData(obj, NAME_TO_STR(m_user_id), m_user_id);
 		
 		ReadMapData(obj, NAME_TO_STR(m_desk), m_desk);
-		ReadMapData(obj, NAME_TO_STR(m_logic_server_id), m_logic_server_id);
+		
 		return true;
 	}
 
 	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
 	{
-		WriteMap(pack, 6);
+		WriteMap(pack, 5);
 		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
 		WriteKeyValue(pack, NAME_TO_STR(m_errorCode), m_errorCode);
 		WriteKeyValue(pack, NAME_TO_STR(m_type), m_type);
 		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
 		
 		WriteKeyValue(pack, NAME_TO_STR(m_desk), m_desk);
-		WriteKeyValue(pack, NAME_TO_STR(m_logic_server_id), m_logic_server_id);
+		
+		
 		return true;
 	}
 
@@ -1151,5 +1280,95 @@ struct LMsgS2CChessResult :public LMsgSC
 	virtual LMsg* Clone() { return new LMsgS2CChessResult(); }
 };
 
+
+//****************************************************************************
+
+struct LMsgC2STest :public LMsgSC
+{
+	std::vector<MsgUserInfo> m_users;
+
+
+	LMsgC2STest() :LMsgSC(MSG_C_2_S_TEST)
+	{
+		m_users.clear();
+	}
+
+	virtual bool Read(msgpack::object& obj)
+	{
+		ReadMapData(obj, NAME_TO_STR(m_user_id), m_user_id);
+		//ReadMapData(obj, NAME_TO_STR(m_users), m_users);
+		msgpack::object array;
+		ReadMapData(obj, NAME_TO_STR(m_users), array);
+		if (array.type == msgpack::v1::type::ARRAY)
+		{
+			Lint m_count = array.via.array.size;
+			for (Lsize i = 0; i < array.via.array.size; ++i)
+			{
+				MsgUserInfo v;
+				msgpack::object& obj = *(array.via.array.ptr + i);
+				obj.convert(v);
+				m_users.push_back(v);
+			}
+		}
+
+
+		return true;
+	}
+
+	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
+	{
+		WriteMap(pack, 3);
+		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
+		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
+		WriteKeyValue(pack, NAME_TO_STR(m_users), m_users);
+
+		return true;
+	}
+
+	virtual LMsg* Clone()
+	{
+		return new LMsgC2STest();
+	}
+};
+
+struct LMsgS2CTest :public LMsgSC
+{
+	std::vector<MsgUserInfo> m_users;
+
+	DeskMsg					m_desk;
+
+
+	LMsgS2CTest() :LMsgSC(MSG_S_2_C_TEST)
+	{
+		m_users.clear();
+	}
+
+	virtual bool Read(msgpack::object& obj)
+	{
+		ReadMapData(obj, NAME_TO_STR(m_user_id), m_user_id);
+		ReadMapData(obj, NAME_TO_STR(m_users), m_users);
+		ReadMapData(obj, NAME_TO_STR(m_desk), m_desk);
+
+
+		return true;
+	}
+
+	virtual bool Write(msgpack::packer<msgpack::sbuffer>& pack)
+	{
+		WriteMap(pack, 4);
+		WriteKeyValue(pack, NAME_TO_STR(m_msgId), m_msgId);
+		WriteKeyValue(pack, NAME_TO_STR(m_user_id), m_user_id);
+		WriteKeyValue(pack, NAME_TO_STR(m_users), m_users);
+		WriteKeyValue(pack, NAME_TO_STR(m_desk), m_desk);
+
+		return true;
+	}
+
+	virtual LMsg* Clone()
+	{
+		return new LMsgS2CTest();
+	}
+};
+//****************************************************************************
 
 #endif

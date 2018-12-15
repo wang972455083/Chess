@@ -233,6 +233,9 @@ void Work::HanderMsg(LMsg* msg)
 	case MSG_LOGIC_MANAGER_2_G_USER_MSG:
 		HanderLogicManagerServer2UserMsg((LMsgLM2GUserMsg*)msg);
 	break;
+	case MSG_LM_2_G_USER_STATUS_MODIFY:
+		HanderLM2GUserStatusModify((LMsgLM2GUserStatusModify*)msg);
+	break;
 	
 	case MSG_L_2_G_USER_OUT_MSG:
 		{
@@ -287,7 +290,6 @@ void Work::DelSp(LSocketPtr sp)
 
 void Work::HanderUserKick(LMsgKick* msg)
 {
-	// logicManager断线不作处理，等待重连
 	if(m_logicManager == msg->m_sp || IsGameServerSP(msg->m_sp) || IsLogicSP(msg->m_sp))
 		return;
 
@@ -336,7 +338,7 @@ void Work::HanderClientIn(LMsgIn* msg)
 
 	LLOG_ERROR("Connecting Client succeed");
 
-	/*GateUser* info = gGateUserManager.GetUserBySp(msg->m_sp);
+	GUserPtr info = gGateUserManager.GetUserBySp(msg->m_sp);
 	if (info != NULL)
 	{
 		LLOG_DEBUG("Work::HanderClientIn already in ");
@@ -344,7 +346,7 @@ void Work::HanderClientIn(LMsgIn* msg)
 	}
 
 	//这里添加一个新连接进来
-	gGateUserManager.CreateUser(msg->m_sp);*/
+	gGateUserManager.CreateUser(msg->m_sp);
 }
 
 void Work::HanderHttp(LMsgHttp* msg)
@@ -704,26 +706,7 @@ GameServerInfo* Work::GetGameServerById(GUserPtr user)
 	return game_server;
 }
 
-bool Work::Login(LSocketPtr sp,Lint user_id)
-{
-	if (nullptr == sp)
-		return false;
-	
-	GUserPtr user = gGateUserManager.GetUserById(user_id);
-	if (user == nullptr)
-	{
-		user = gGateUserManager.CreateUser(user_id, sp);
-	}
-	else
-	{
-		LLOG_DEBUG("User Relogin %d",user_id);
-		//這裡是重新登錄而且正好登錄在此Gate
-		user->m_sp = sp;
-	}
-	
 
-	return true;
-}
 //負載均衡
 GameServerInfo*	Work::SelectNewGameServer(Lint uid)
 {
@@ -763,6 +746,7 @@ void Work::HanderUser2GameServerMsg(LMsgG2GameUserMsg* msg)
 	msgpack::unpacked  unpack;
 	msgpack::unpack(&unpack, userMsg->m_dataBuff->Data() + userMsg->m_dataBuff->GetOffset(), userMsg->m_dataBuff->Size() - userMsg->m_dataBuff->GetOffset());
 	msgpack::object obj = unpack.get();
+	cout << obj;
 	int user_id = 0;
 	//必须有，如果没有则报错
 	ReadMapData(obj, "m_user_id", user_id);
@@ -772,17 +756,51 @@ void Work::HanderUser2GameServerMsg(LMsgG2GameUserMsg* msg)
 		return;
 	}
 
-	if (userMsg->m_userMsgId == MSG_C_2_S_LOGIN)
-	{
-		Login(msg->m_sp, user_id);	
-	}
-	GUserPtr user = gGateUserManager.GetUserById(user_id);
+
+	GUserPtr user = gGateUserManager.GetUserBySp(msg->m_sp);
 	if (nullptr == user)
 		return;
 
+	if (userMsg->m_userMsgId == MSG_C_2_S_LOGIN)
+	{
+		gGateUserManager.Login(user, user_id);
+	}
+	else if (userMsg->m_userMsgId == MSG_C_2_S_TEST)
+	{
+		LMsg* m_userMsg = LMsgFactory::Instance().CreateMsg(userMsg->m_userMsgId);
+		if (m_userMsg)
+		{
+			m_userMsg->Read(obj);
+		}
+		
+		LMsgC2STest* test = (LMsgC2STest*)m_userMsg;
+
+		LMsgS2CTest send;
+		send.m_user_id = test->m_user_id;
+		for (int i = 0; i < test->m_users.size();++i)
+		{
+			send.m_users.push_back(test->m_users[i]);
+
+			send.m_desk.m_users.push_back(test->m_users[i]);
+		}
+
+		msgpack::sbuffer buffer;
+		msgpack::packer<msgpack::sbuffer> pac(&buffer);
+		send.Write(pac);
+
+		msgpack::unpacked  unpack;
+		msgpack::unpack(&unpack, buffer.data(), buffer.size());
+
+		msgpack::object  obj = unpack.get();
+		cout << obj;
+
+		msg->m_sp->Send(send.GetSendBuff());
+	}
+	
+
 	
 	
-	SendToGameServer(user, userMsg);
+	//SendToGameServer(user, userMsg);
 }
 
 void Work::HanderGameServer2UserMsg(LMsgGame2GUserMsg* msg)
@@ -802,9 +820,29 @@ void Work::HanderUser2LogicManagerServerMsg(LMsgG2LMUserMsg* msg)
 {
 	
 
-	if (msg->m_userMsgId == MSG_C_2_S_DESK_OPT)
+	/*if (msg->m_userMsgId == MSG_C_2_S_DESK_OPT)
 	{
-		LMsgC2SDeskOpt* opt = (LMsgC2SDeskOpt*)(msg->m_userMsg);
+		//LMsgC2SDeskOpt* opt = (LMsgC2SDeskOpt*)(msg->m_userMsg);
+
+		
+			LBuffPtr buff = msg->m_dataBuff;
+			msgpack::unpacked  unpack;
+			msgpack::unpack(&unpack, buff->Data() + buff->GetOffset(), buff->Size() - buff->GetOffset());
+			msgpack::object obj = unpack.get();
+
+			
+			LMsg* user_msg = LMsgFactory::Instance().CreateMsg(msg->m_userMsgId);
+			if (user_msg)
+			{
+				user_msg->Read(obj);
+			}
+			else
+			{
+				LLOG_ERROR("LMsgG2LMUserMsg read msgId not exiest %d", msg->m_userMsgId);
+			}
+
+
+			LMsgC2SDeskOpt* opt = (LMsgC2SDeskOpt*)user_msg;
 
 		LMsgS2CDeskOpt send;
 		send.m_user_id = 1;
@@ -813,12 +851,17 @@ void Work::HanderUser2LogicManagerServerMsg(LMsgG2LMUserMsg* msg)
 		send.m_desk.m_desk_id = 1;
 		send.m_logic_server_id = 10;
 
+		for (int i = 0; i < opt->m_list.size(); i++)
+		{
+			send.m_list.push_back(opt->m_list[i]);
+		}
+
 		msg->m_sp->Send(send.GetSendBuff());
 		return;
-	}
+	}*/
 
 	//**************************************
-	//m_logicManager->Send(msg->GetSendBuff());
+	m_logicManager->Send(msg->GetSendBuff());
 }
 
 void Work::HanderLogicManagerServer2UserMsg(LMsgLM2GUserMsg* msg)
@@ -829,20 +872,6 @@ void Work::HanderLogicManagerServer2UserMsg(LMsgLM2GUserMsg* msg)
 	GUserPtr user = gGateUserManager.GetUserById(user_id);
 	if (nullptr == user)
 		return;
-
-	if (userMsg->m_user_msg_id == MSG_S_2_C_DESK_OPT)
-	{
-		
-		msgpack::unpacked  unpack;
-		msgpack::unpack(&unpack, userMsg->m_dataBuff->Data() + userMsg->m_dataBuff->GetOffset(), userMsg->m_dataBuff->Size() - userMsg->m_dataBuff->GetOffset());
-		msgpack::object obj = unpack.get();
-		int logic_server_id = 0;
-		//必须有，如果没有则报错
-		ReadMapData(obj, "m_logic_server_id", logic_server_id);
-		//标记一下桌子在哪个logicserver上
-		user->m_logicID = logic_server_id;
-	}
-
 
 	user->m_sp->Send(userMsg->m_dataBuff);
 }
@@ -881,5 +910,14 @@ void Work::HanderLogicServer2UserMsg(LMsgL2GUserMsg* msg)
 	{
 		user->m_sp->Send(msg->m_dataBuff);
 	}
-	
+}
+
+void Work::HanderLM2GUserStatusModify(LMsgLM2GUserStatusModify* msg)
+{
+	GUserPtr user = gGateUserManager.GetUserById(msg->m_user_id);
+	if (user)
+	{
+		user->m_status = msg->m_status;
+		user->m_logicID = msg->m_logic_server_id;
+	}
 }

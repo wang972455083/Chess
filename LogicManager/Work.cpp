@@ -277,7 +277,9 @@ void Work::HanderMsg(LMsg* msg)
 	case MSG_GAME_2_LM_LOGIN:
 		HanderGame2LMLogin((LMsgGame2LMGLogin*)msg);
 		break;
-	
+	case MSG_L_2_LM_DESK_OPT:
+		HanderDeskOptRespon((LMsgL2LMDeskOpt*)msg);
+		break;
 	default:
 		LLOG_DEBUG("Unknown message id: %d", msg->m_msgId);
 		break;
@@ -563,10 +565,11 @@ void Work::HanderGateUserMsg(LMsgG2LMUserMsg* msg,GateInfo* gate)
 		switch (msg->m_userMsgId)
 		{
 		case MSG_C_2_S_DESK_OPT:
-			HanderDeskOpt((LMsgC2SDeskOpt*)msg);
+			HanderDeskOpt((LMsgC2SDeskOpt*)msg->m_userMsg);
 		break;
-		case MSG_C_2_S_NOTICE_LOGIN:
-			HanderUserLogin((LMsgC2SNoticeLogin*)msg);
+		
+		case MSG_C_2_S_LM_LOGIN:
+			HanderUserLogin(msg->m_sp,(LMsgC2SLMLogin*)msg->m_userMsg);
 		break;
 		}
 	}
@@ -961,11 +964,15 @@ void Work::HanderDeskOpt(LMsgC2SDeskOpt* msg)
 			if (nullptr == logic)
 				return;
 
-			LMsgLM2LDeskOpt send;
+			LMsgLM2LDeskOpt	 send;
 			send.m_user_id = user_id;
+			send.m_type = msg->m_type;
 			send.m_desk_id = desk_id;
 			send.m_desk_type = msg->m_desk_type;
 			send.m_cost = msg->m_cost;
+			send.m_self.m_user_id = msg->m_user_id;
+			send.m_self.m_name = msg->m_name;
+			send.m_self.m_head_icon = msg->m_head_icon;
 
 			logic->m_sp->Send(send.GetSendBuff());
 
@@ -978,7 +985,7 @@ void Work::HanderDeskOpt(LMsgC2SDeskOpt* msg)
 			SendMessageToUser(msg->m_sp, user_id, send);
 		}
 	}
-	else
+	else if (msg->m_type == LMsgC2SDeskOpt::TYPE_ADD_TO_DESK)
 	{
 		int desk_id = gDeskManager.GetUserDeskID(user_id);
 		if (desk_id == 0)
@@ -994,12 +1001,52 @@ void Work::HanderDeskOpt(LMsgC2SDeskOpt* msg)
 				{
 					LMsgLM2LDeskOpt send;
 					send.m_user_id = msg->m_user_id;
-					send.m_desk_id = msg->m_desk_id;
 					send.m_type = msg->m_type;
+					send.m_desk_id = msg->m_desk_id;
+					send.m_self.m_user_id = msg->m_user_id;
+					send.m_self.m_name = msg->m_name;
+					send.m_self.m_head_icon = msg->m_head_icon;
 
 					logic->m_sp->Send(send.GetSendBuff());
 				}
 			}
+		}
+		else
+		{
+			LMsgS2CDeskOpt send;
+			send.m_errorCode = 1;
+
+			SendMessageToUser(msg->m_sp, user_id, send);
+		}
+	}
+	else if (msg->m_type == LMsgC2SDeskOpt::TYPE_QUIT_DESK)
+	{
+		if (gDeskManager.GetUserDeskID(user_id) == msg->m_desk_id)
+		{
+			DeskPtr desk = gDeskManager.GetDesk(msg->m_desk_id);
+
+			if (desk)
+			{
+				LogicInfo* logic = GetLogicInfoById(desk->m_logic_server_id);
+				if (logic)
+				{
+					LMsgLM2LDeskOpt send;
+					send.m_user_id = msg->m_user_id;
+					send.m_type = msg->m_type;
+					send.m_desk_id = msg->m_desk_id;
+					
+					
+
+					logic->m_sp->Send(send.GetSendBuff());
+				}
+			}
+		}
+		else
+		{
+			LMsgS2CDeskOpt send;
+			send.m_errorCode = 2;
+
+			SendMessageToUser(msg->m_sp, user_id, send);
 		}
 	}
 }
@@ -1012,55 +1059,79 @@ void Work::HanderDeskOptRespon(LMsgL2LMDeskOpt* msg)
 	send.m_type = msg->m_type;
 	Lint user_id = msg->m_user_id;
 
-	if (msg->m_type == 1)
+	if (msg->m_type == LMsgC2SDeskOpt::TYPE_CREATE_DESK)
 	{
-		DeskPtr desk = gDeskManager.CreateDesk(msg->m_desk_id);
-		if (desk == nullptr)
+		if (msg->m_result)
 		{
 			gDeskManager.RecycleDeskID(msg->m_desk_id);
 		}
+		else
+		{
+			DeskPtr desk = gDeskManager.CreateDesk(msg->m_desk_id);
+			if (desk == nullptr)
+			{
+				gDeskManager.RecycleDeskID(msg->m_desk_id);
+			}
 
-		LogicInfo* logic = GetLogicInfoBySp(msg->m_sp);
-		if (logic == nullptr)
-			return;
+			LogicInfo* logic = GetLogicInfoBySp(msg->m_sp);
+			if (logic == nullptr)
+				return;
 
-		logic->m_deskCount++;
-		desk->m_logic_server_id = logic->m_id;
+			logic->m_deskCount++;
+			desk->m_logic_server_id = logic->m_id;
 
-		gDeskManager.AddUserToDesk(msg->m_desk_id, user_id);
+			gDeskManager.AddUserToDesk(msg->m_desk_id, user_id);
 
-		send.m_desk.m_desk_id = msg->m_desk_id;
-		send.m_desk.m_desk_type = msg->m_desk_type;
-		send.m_desk.m_cost = msg->m_cost;
+			FillDeskMsg(send.m_desk, msg);
 
-		send.m_logic_server_id = desk->m_logic_server_id;
+			msgpack::sbuffer buffer;
+			msgpack::packer<msgpack::sbuffer> pac(&buffer);
+			send.Write(pac);
 
-		
+			msgpack::unpacked  unpack;
+			msgpack::unpack(&unpack, buffer.data(), buffer.size());
+
+			msgpack::object  obj = unpack.get();
+
+			cout << obj << endl;
+
+
+			ModifyUserStatus(user_id, US_DESK, desk->m_logic_server_id);
+		}
 	}
 	//加入桌子
-	else if (msg->m_type == 2)
+	else if (msg->m_type == LMsgC2SDeskOpt::TYPE_ADD_TO_DESK)
 	{
-		gDeskManager.AddUserToDesk(msg->m_desk_id, user_id);
-
-		send.m_desk.m_desk_id = msg->m_desk_id;
-		send.m_desk.m_desk_type = msg->m_desk_type;
-		send.m_desk.m_cost = msg->m_cost;
-
-		DeskPtr desk = gDeskManager.GetDesk(msg->m_desk_id);
-		if (nullptr == desk)
-			return;
-
-		send.m_logic_server_id = desk->m_logic_server_id;
-	}
-	else
-	{
-		gDeskManager.DelUserToDesk(msg->m_desk_id, user_id);
-		if (msg->m_del_desk)
+		if (msg->m_result == 0)
 		{
-			gDeskManager.DeleteDesk(msg->m_desk_id);
-		}
+			gDeskManager.AddUserToDesk(msg->m_desk_id, user_id);
 
-		send.m_logic_server_id = 0;
+			send.m_desk.m_desk_id = msg->m_desk_id;
+			send.m_desk.m_desk_type = msg->m_desk_type;
+			send.m_desk.m_cost = msg->m_cost;
+
+			DeskPtr desk = gDeskManager.GetDesk(msg->m_desk_id);
+			if (nullptr == desk)
+				return;
+
+			FillDeskMsg(send.m_desk, msg);
+
+			ModifyUserStatus(user_id, US_DESK, desk->m_logic_server_id);
+		}
+		
+	}
+	else if(msg->m_type == LMsgC2SDeskOpt::TYPE_QUIT_DESK)
+	{
+		if (msg->m_result == 0)
+		{
+			gDeskManager.DelUserToDesk(msg->m_desk_id, user_id);
+			if (msg->m_del_desk)
+			{
+				gDeskManager.DeleteDesk(msg->m_desk_id);
+			}
+
+			ModifyUserStatus(user_id, US_CENTER, 0);
+		}
 	}
 
 	LSocketPtr sp = GetGateSpByUserId(user_id);
@@ -1071,12 +1142,16 @@ void Work::HanderDeskOptRespon(LMsgL2LMDeskOpt* msg)
 }
 
 
-void Work::FillDeskMsg(DeskMsg& msg, DeskPtr desk)
+void Work::FillDeskMsg(DeskMsg& send, LMsgL2LMDeskOpt* msg)
 {
-	msg.m_desk_id = desk->m_desk_id;
-	//msg.m_create_id = desk->m_create_user_id;
-	//msg.m_desk_type = desk->m_desk_type;
-	//msg.m_cost = desk->m_cost;
+	send.m_desk_id = msg->m_desk_id;
+	send.m_desk_type = msg->m_desk_type;
+	send.m_cost = msg->m_cost;
+
+	for (int i = 0; i < msg->m_users.size(); ++i)
+	{
+		send.m_users.push_back(msg->m_users[i]);
+	}
 }
 
 
@@ -1094,9 +1169,22 @@ void Work::SendMessageToUser(LSocketPtr sp, Lint user_id,LMsg& msg)
 	}
 }
 
-void Work::HanderUserLogin(LMsgC2SNoticeLogin* msg)
+void Work::HanderUserLogin(LSocketPtr sp, LMsgC2SLMLogin* msg)
 {
-	m_users_gate_sp[msg->m_user_id] = msg->m_sp;
+	if (sp == nullptr || msg == nullptr)
+		return;
+
+	int user_id = msg->m_user_id;
+	m_users_gate_sp[user_id] = sp;
+
+	LMsgS2CLMLogin send;
+	send.m_user_id = user_id;
+
+	//LSocketPtr sp = GetGateSpByUserId(user_id);
+	if (sp)
+	{
+		SendMessageToUser(sp, user_id, send);
+	}
 }
 
 LSocketPtr Work::GetGateSpByUserId(int user_id)
@@ -1108,6 +1196,20 @@ LSocketPtr Work::GetGateSpByUserId(int user_id)
 	}
 
 	return nullptr;
+}
+
+void Work::ModifyUserStatus(int user_id, USER_STATUS status, int logic_server_id)
+{
+	LMsgLM2GUserStatusModify send;
+	send.m_user_id = user_id;
+	send.m_status = status;
+	send.m_logic_server_id = logic_server_id;
+
+	LSocketPtr sp = GetGateSpByUserId(user_id);
+	if (sp)
+	{
+		SendMessageToUser(sp, user_id, send);
+	}
 }
 
 

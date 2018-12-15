@@ -9,7 +9,7 @@
 class User
 {
 public:
-	User();
+	User(int user_id,Lstring name,Lstring head_icon);
 	~User();
 public:
 	void	Clear();
@@ -35,13 +35,23 @@ public:
 	//std::vector<Lint>&	GetInitChessBoard();
 	//void	SetInitChessBoard(std::vector<Lint> init_chess);
 
-	
+	Lstring GetName()
+	{
+		return m_name;
+	}
+
+	Lstring GetHeadIcon()
+	{
+		return m_head_icon;
+	}
 
 private:
 	Lint	m_user_id;
 	Lint	m_status;
 	std::vector<Lint>	m_init_chess;  //上场的棋子
 	Lint	m_gate_id;
+	Lstring	m_name;
+	Lstring m_head_icon;
 	
 };
 

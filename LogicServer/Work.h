@@ -10,6 +10,7 @@
 #include "TCPClient.h"
 #include "GarbageCollectionService.h"
 #include "LCardsOperType.h"
+#include "DeskManager.h"
 
 class User;
 
@@ -69,7 +70,7 @@ public:
 	void			HanderChessUpgrade(LMsgC2SChessUpgrade* msg);
 public:
 	void			SendMessageToUser(LSocketPtr sp, Lint user_id, LMsg& msg);
-
+	void			FillDeskMsg(LMsgL2LMDeskOpt& send, LDeskPtr desk);
 private:
 	LTime		m_tickTimer;
 

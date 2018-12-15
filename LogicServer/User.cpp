@@ -1,8 +1,14 @@
-#include "UserManager.h"
+#include "User.h"
 
-User::User()
+User::User(int user_id,Lstring name,Lstring head_icon)
 {
-	Clear();
+	m_user_id = user_id;
+	m_name = name;
+	m_head_icon = head_icon;
+
+	m_status = 0;
+	m_gate_id = 0;
+	m_init_chess.clear();
 }
 
 User::~User()
@@ -13,6 +19,8 @@ User::~User()
 void User::Clear()
 {
 	m_user_id = 0;
+	m_name = "";
+
 	m_status = 0;
 	m_init_chess.clear();
 }
@@ -43,15 +51,7 @@ void User::SetStatus(Lint status)
 
 
 
-std::vector<Lint>&	User::GetInitChessBoard()
-{
-	return m_init_chess;
-}
 
-void User::SetInitChessBoard(std::vector<Lint> init_chess)
-{
-	m_init_chess = init_chess;
-}
 
 
 

@@ -157,6 +157,12 @@ bool LMsgFactory::Init()
 
 	RegestMsg(new LMsgLM2LDeskOpt());
 	RegestMsg(new LMsgL2LMDeskOpt());
+
+	RegestMsg(new LMsgC2SLMLogin());
+	RegestMsg(new LMsgS2CLMLogin());
+
+	RegestMsg(new LMsgC2STest());
+	RegestMsg(new LMsgS2CTest());
 	return true;
 }
 

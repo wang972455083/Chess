@@ -16,7 +16,7 @@ public:
 	~Desk();
 	void Clear();
 
-	bool AddUser(int user_id);
+	bool AddUser(LUserPtr user);
 	bool DelUser(Lint user_id);
 
 	LUserPtr GetDeskUser(Lint user_id);
@@ -83,7 +83,7 @@ public:
 	bool			IsHaveDesk(int user_id);
 
 	bool			AddUserToDesk(Lint desk_id, Lint user_id);
-	bool			AddUserToDesk(LDeskPtr desk, Lint user_id);
+	bool			AddUserToDesk(LDeskPtr desk, LUserPtr user);
 
 	void			DeleteUserToDesk(LDeskPtr desk, Lint user_id);
 	bool			DeleteDesk(Lint desk_id);

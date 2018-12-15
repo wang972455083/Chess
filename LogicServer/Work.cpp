@@ -4,7 +4,7 @@
 #include "InsideNet.h"
 #include "LMsgS2S.h"
 
-#include "DeskManager.h"
+
 
 #include <openssl/md5.h>
 #include "TableManager.h"
@@ -472,12 +472,24 @@ void Work::HanderDeskOpt(LMsgLM2LDeskOpt* msg)
 			desk->m_desk_type = msg->m_desk_type;
 			desk->m_cost = msg->m_cost;
 
-			if (!gDeskManager.AddUserToDesk(desk, user_id))
+			
+
+			LUserPtr user = std::make_shared<User>(msg->m_self.m_user_id, msg->m_self.m_name, msg->m_self.m_head_icon);
+
+			if (!gDeskManager.AddUserToDesk(desk, user))
 			{
 				result = 3;
 				break;
 			}
+
+			if (result == 0)
+			{
+				FillDeskMsg(send, desk);
+			}
+
 		} while (0);
+
+		msg->m_sp->Send(send.GetSendBuff());
 	}
 	//加入
 	else if (msg->m_type == 2)
@@ -497,7 +509,9 @@ void Work::HanderDeskOpt(LMsgLM2LDeskOpt* msg)
 				break;
 			}
 
-			if (!gDeskManager.AddUserToDesk(desk, user_id))
+			LUserPtr user = std::make_shared<User>(msg->m_self.m_user_id, msg->m_self.m_name, msg->m_self.m_head_icon);
+
+			if (!gDeskManager.AddUserToDesk(desk, user))
 			{
 				result = 3;
 				break;
@@ -506,14 +520,11 @@ void Work::HanderDeskOpt(LMsgLM2LDeskOpt* msg)
 			send.m_result = result;
 			if (result == 0)
 			{
-				send.m_desk_id = msg->m_desk_id;
-				send.m_desk_type = desk->m_desk_type;
-				send.m_cost = desk->m_cost;
+				FillDeskMsg(send, desk);
 			}
-
-			msg->m_sp->Send(send.GetSendBuff());
-
 		} while (0);
+
+		msg->m_sp->Send(send.GetSendBuff());
 	}
 	else    //退出zhuozi
 	{
@@ -550,9 +561,9 @@ void Work::HanderDeskOpt(LMsgLM2LDeskOpt* msg)
 				send.m_del_desk = del_desk;
 			}
 
-			msg->m_sp->Send(send.GetSendBuff());
-
 		} while (0);
+
+		msg->m_sp->Send(send.GetSendBuff());
 	}
 }
 
@@ -653,6 +664,24 @@ void Work::SendMessageToUser(LSocketPtr sp, Lint user_id, LMsg& msg)
 	}
 }
 
+void Work::FillDeskMsg(LMsgL2LMDeskOpt& send, LDeskPtr desk)
+{
+	send.m_desk_id = desk->m_desk_id;
+	send.m_desk_type = desk->m_desk_type;
+	send.m_cost = desk->m_cost;
+
+	for (int i = 0; i < desk->GetAllUsers().size(); ++i)
+	{
+		LUserPtr user = desk->GetAllUsers()[i];
+
+		MsgUserInfo msgUser;
+		msgUser.m_user_id = user->GetUserId();
+		msgUser.m_name = user->GetName();
+		msgUser.m_head_icon = user->GetHeadIcon();
+
+		send.m_users.push_back(msgUser);
+	}
+}
 
 
 

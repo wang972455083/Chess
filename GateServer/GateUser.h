@@ -12,6 +12,7 @@ struct GateUser
 	Lint			m_userState;				//玩家当前状态
 	Lint			m_logicID;					//玩家在哪个logic上面
 	Lint			m_game_server_id;			//在哪個gameserver上
+	Lint			m_status;					//状态，大厅或者桌子上
 	GateUser()
 	{
 		m_user_id = 0;
@@ -19,6 +20,7 @@ struct GateUser
 		m_userState = 0;
 		m_logicID = 0;
 		m_game_server_id = 0;
+		m_status = 0;
 	}
 	Lint	getUserState(){return m_userState;}
 	void	setUserState(Lint nValue){m_userState = nValue;}
@@ -43,10 +45,14 @@ public:
 
 	GUserPtr GetUserById(Lint user_id);
 	GUserPtr GetUserBySp(LSocketPtr sp);
-	void	AddUser(GUserPtr user);
+	void	AddUserToSpMap(GUserPtr user);
+	void	AddUserToUidMap(GUserPtr user);
 	void	DelUser(GUserPtr user);
 
-	GUserPtr	CreateUser(Lint user_id, LSocketPtr sp);
+
+	GUserPtr	CreateUser(LSocketPtr sp);
+
+	void		Login(GUserPtr user, int user_id);
 	
 private:
 	std::map<Lint, GUserPtr>	m_gateUserIdMap;

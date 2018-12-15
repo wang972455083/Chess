@@ -97,7 +97,7 @@ Lint	DeskManager::GetUserDeskID(Lint user_id)
 
 DeskPtr DeskManager::CreateDesk(Lint desk_id)
 {
-	DeskPtr desk = std::shared_ptr<Desk>();
+	DeskPtr desk = std::make_shared<Desk>();
 	desk->m_desk_id = desk_id;
 	m_desks[desk_id] = desk;
 	

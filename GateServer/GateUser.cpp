@@ -12,17 +12,6 @@ bool GateUserManager::Final()
 	return true;
 }
 
-GUserPtr GateUserManager::GetUserBySp(LSocketPtr sp)
-{
-	auto iter = m_gateUserSpMap.find(sp);
-	if (iter != m_gateUserSpMap.end())
-	{
-		return iter->second;
-	}
-
-	return nullptr;
-}
-
 
 GUserPtr GateUserManager::GetUserById(Lint user_id)
 {
@@ -35,12 +24,27 @@ GUserPtr GateUserManager::GetUserById(Lint user_id)
 	return NULL;
 }
 
-void GateUserManager::AddUser(GUserPtr user)
+GUserPtr GateUserManager::GetUserBySp(LSocketPtr sp)
+{
+	auto iter = m_gateUserSpMap.find(sp);
+	if (iter != m_gateUserSpMap.end())
+	{
+		return iter->second;
+	}
+
+	return NULL;
+}
+
+void GateUserManager::AddUserToSpMap(GUserPtr user)
 {
 	
-	m_gateUserIdMap[user->m_user_id] = user;
-
 	m_gateUserSpMap[user->m_sp] = user;
+}
+
+void GateUserManager::AddUserToUidMap(GUserPtr user)
+{
+
+	m_gateUserIdMap[user->m_user_id] = user;
 }
 
 void GateUserManager::DelUser(GUserPtr user)
@@ -56,26 +60,26 @@ void GateUserManager::DelUser(GUserPtr user)
 	{
 		m_gateUserIdMap.erase(iter1);
 	}
-	
-	auto iter2 = m_gateUserSpMap.find(sp);
-	if (iter2 != m_gateUserSpMap.end())
-	{
-		m_gateUserSpMap.erase(iter2);
-	}
-
 }
 
-GUserPtr GateUserManager::CreateUser(Lint user_id,LSocketPtr sp)
+GUserPtr GateUserManager::CreateUser(LSocketPtr sp)
 {
 	GUserPtr user = std::make_shared<GateUser>();
 	
-	user->m_user_id = user_id;
+	//user->m_user_id = user_id;
 	user->m_sp = sp;
 	user->m_login = 0;
 
-	AddUser(user);
+	AddUserToSpMap(user);
 	LLOG_DEBUG("GateUserManager::CreateUser AddUser ");
 	return user;
+}
+
+void GateUserManager::Login(GUserPtr user, int user_id)
+{
+	user->m_user_id = user_id;
+
+	AddUserToUidMap(user);
 }
 
 

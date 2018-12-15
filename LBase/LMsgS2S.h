@@ -968,9 +968,11 @@ struct LMsgLM2LDeskOpt : public LMsg
 	Lint			m_desk_type;
 	Lint			m_cost;
 
+	MsgUserInfo		m_self;
+
 
 	LMsgLM2LDeskOpt() :LMsg(MSG_LM_2_L_DESK_OPT)
-		, m_user_id(0),m_desk_id(0),m_desk_type(0),m_cost(0)
+		, m_user_id(0),m_type(0),m_desk_id(0),m_desk_type(0),m_cost(0)
 	{
 	}
 
@@ -982,6 +984,11 @@ struct LMsgLM2LDeskOpt : public LMsg
 		buff.Read(m_desk_id);
 		buff.Read(m_desk_type);
 		buff.Read(m_cost);
+
+		buff.Read(m_self.m_user_id);
+		buff.Read(m_self.m_name);
+		buff.Read(m_self.m_head_icon);
+		//buff.Read(m_self.m_pos);
 		
 		return true;
 	}
@@ -994,6 +1001,11 @@ struct LMsgLM2LDeskOpt : public LMsg
 		buff.Write(m_desk_id);
 		buff.Write(m_desk_type);
 		buff.Write(m_cost);
+
+		buff.Write(m_self.m_user_id);
+		buff.Write(m_self.m_name);
+		buff.Write(m_self.m_head_icon);
+		//buff.Write(m_self.m_pos);
 		
 		return true;
 	}
@@ -1017,11 +1029,15 @@ struct LMsgL2LMDeskOpt : public LMsg
 
 	bool			m_del_desk;			//是否删掉桌子
 
+	int				m_user_cnt;			//房间人数
+	std::vector<MsgUserInfo>	m_users;	//房间人信息
+
 
 
 	LMsgL2LMDeskOpt() :LMsg(MSG_L_2_LM_DESK_OPT)
-		, m_result(0), m_user_id(0),m_type(0), m_desk_id(0), m_desk_type(0), m_cost(0), m_del_desk(0)
+		, m_result(0), m_user_id(0),m_type(0), m_desk_id(0), m_desk_type(0), m_cost(0), m_del_desk(0), m_user_cnt(0)
 	{
+		m_users.clear();
 	}
 
 	virtual bool Read(LBuff& buff)
@@ -1033,6 +1049,19 @@ struct LMsgL2LMDeskOpt : public LMsg
 		buff.Read(m_desk_type);
 		buff.Read(m_cost);
 		buff.Read(m_del_desk);
+
+		buff.Read(m_user_cnt);
+
+		for (int i = 0; i < m_user_cnt; ++i)
+		{
+			MsgUserInfo user;
+			buff.Read(user.m_user_id);
+			buff.Read(user.m_name);
+			buff.Read(user.m_head_icon);
+			//buff.Read(user.m_pos);
+
+			m_users.push_back(user);
+		}
 
 		return true;
 	}
@@ -1047,6 +1076,17 @@ struct LMsgL2LMDeskOpt : public LMsg
 		buff.Write(m_cost);
 		buff.Write(m_del_desk);
 
+		int user_cnt = m_users.size();
+		buff.Write(user_cnt);
+		for (int i = 0; i < m_users.size(); ++i)
+		{
+			MsgUserInfo& user = m_users[i];
+			buff.Write(user.m_user_id);
+			buff.Write(user.m_name);
+			buff.Write(user.m_head_icon);
+			//buff.Write(user.m_pos);
+		}
+
 		return true;
 	}
 
@@ -1055,5 +1095,48 @@ struct LMsgL2LMDeskOpt : public LMsg
 		return new LMsgL2LMDeskOpt();
 	}
 };
+
+
+struct LMsgLM2GUserStatusModify : public LMsg
+{
+	Lint			m_user_id;	
+	Lint			m_status;		//状态0，大厅  1，房间
+	Lint			m_logic_server_id;  
+
+
+	LMsgLM2GUserStatusModify() :LMsg(MSG_LM_2_G_USER_STATUS_MODIFY)
+		, m_user_id(0), m_status(0), m_logic_server_id(0)
+	{
+	}
+
+	virtual bool Read(LBuff& buff)
+	{
+		buff.Read(m_user_id);
+		buff.Read(m_status);
+		buff.Read(m_logic_server_id);
+		
+
+		return true;
+	}
+
+	virtual bool Write(LBuff& buff)
+	{
+		buff.Write(m_user_id);
+		buff.Write(m_status);
+		buff.Write(m_logic_server_id);
+	
+
+		return true;
+	}
+
+	virtual LMsg* Clone()
+	{
+		return new LMsgLM2GUserStatusModify();
+	}
+};
+
+
+
+
 
 #endif

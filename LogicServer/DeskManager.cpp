@@ -26,13 +26,13 @@ void Desk::Clear()
 	//m_game.Clear();
 }
 
-bool Desk::AddUser(int user_id)
+bool Desk::AddUser(LUserPtr user)
 {
 	if (IsFull())
 		return false;
 
-	LUserPtr user = std::shared_ptr<User>();
-	user->SetUserId(user_id);
+	//LUserPtr user = std::shared_ptr<User>();
+	//user->SetUserId(user_id);
 	
 	m_desk_user.push_back(user);
 
@@ -175,14 +175,14 @@ bool DeskManager::AddUserToDesk(Lint desk_id, Lint user_id)
 	return true;
 }
 
-bool DeskManager::AddUserToDesk(LDeskPtr desk, Lint user_id)
+bool DeskManager::AddUserToDesk(LDeskPtr desk, LUserPtr user)
 {
-	if (desk == nullptr)
+	if (desk == nullptr || user == nullptr)
 		return false;
 
-	if (desk->AddUser(user_id))
+	if (desk->AddUser(user))
 	{
-		m_user_desk[user_id] = desk->m_desk_id;
+		m_user_desk[user->GetUserId()] = desk->m_desk_id;
 
 		return true;
 	}

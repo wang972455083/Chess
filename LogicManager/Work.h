@@ -142,12 +142,16 @@ private:
 public:
 
 	void			HanderDeskOpt(LMsgC2SDeskOpt* msg);
+	
 	void			HanderDeskOptRespon(LMsgL2LMDeskOpt* msg);
-	void			FillDeskMsg(DeskMsg& msg, DeskPtr desk);
+	
+	void			FillDeskMsg(DeskMsg& send, LMsgL2LMDeskOpt* msg);
 
-	void			HanderUserLogin(LMsgC2SNoticeLogin* msg);
+	void			HanderUserLogin(LSocketPtr sp,LMsgC2SLMLogin* msg);
 
 	LSocketPtr		GetGateSpByUserId(int user_id);
+
+	void			ModifyUserStatus(int user_id, USER_STATUS status, int logic_server_id);
 
 private:
 	LTime		m_tickTimer;

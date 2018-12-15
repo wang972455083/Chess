@@ -49,6 +49,8 @@ public:
 	void			HanderUser2LogicServerMsg(LMsgG2LUserMsg* msg);
 	void			HanderLogicServer2UserMsg(LMsgL2GUserMsg* msg);
 
+	void			HanderLM2GUserStatusModify(LMsgLM2GUserStatusModify* msg);
+
 public:
 
 	void			ConnectToLogicManager();
@@ -83,7 +85,7 @@ private:
 	void			CheckMsgFrequency(Lint interval);
 	
 public:
-	bool			Login(LSocketPtr sp, Lint user_id);
+	//bool			Login(G sp, Lint user_id);
 	GameServerInfo*	SelectNewGameServer(Lint uid);
 
 

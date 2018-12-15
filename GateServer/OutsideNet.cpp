@@ -109,6 +109,7 @@ void OutsideNet::CreateMsgIdTable()
 	m_msgIdTable.insert(MSG_C_2_S_MSG);
 	m_msgIdTable.insert(MSG_C_2_S_RE_LOGIN);
 	m_msgIdTable.insert(MSG_C_2_S_LOGIN);
+	m_msgIdTable.insert(MSG_C_2_S_LM_LOGIN);
 	m_msgIdTable.insert(MSG_C_2_S_HEART);
 	m_msgIdTable.insert(MSG_C_2_S_DESK_OPT);
 	m_msgIdTable.insert(MSG_C_2_S_NOTICE_LOGIN);
@@ -116,6 +117,8 @@ void OutsideNet::CreateMsgIdTable()
 	m_msgIdTable.insert(MSG_C_2_S_CHESS_MOVE);
 	m_msgIdTable.insert(MSG_C_2_S_CHESS_ATTACK);
 	m_msgIdTable.insert(MSG_C_2_S_CHESS_UPGRADE);
+	m_msgIdTable.insert(MSG_C_2_S_TEST);
+	
 	
 }
 
